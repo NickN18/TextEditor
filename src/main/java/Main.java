@@ -37,6 +37,18 @@ interface LibC extends Library
 
         public Termios() {}
 
+        public static Termios of(Termios t)
+        {
+            Termios copy = new Termios();
+            copy.c_iflag = t.c_iflag;
+            copy.c_oflag = t.c_oflag;
+            copy.c_cflag = t.c_cflag;
+            copy.c_lflag = t.c_lflag;
+            copy.c_cc = t.c_cc.clone();
+
+            return copy;
+        }
+
 
 
     }
