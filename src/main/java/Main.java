@@ -2,6 +2,8 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Structure;
 
+import java.util.Arrays;
+
 public class Main
 {
     public static void main(String[] args)
@@ -49,7 +51,17 @@ interface LibC extends Library
             return copy;
         }
 
-
+        @Override
+        public String toString()
+        {
+            return "Termios {" +
+                    "c_iflag = " + c_iflag +
+                    ", c_oflag = " + c_oflag +
+                    ", c_cflag = " + c_cflag +
+                    ", c_lflag = " + c_lflag +
+                    ", c_cc = " + Arrays.toString(c_cc) +
+                    "}";
+        }
 
     }
 
