@@ -53,12 +53,22 @@ interface LibC extends Library
     //Enables XON/XOFF flow control on output
     int IXON = 2000;
 
-    //
+    //Translates carriage return to newline on input
     int ICRNL = 400;
+
+    //Enables implementation-defined input processing
     int IEXTEN = 100000;
+
+    //Enable implementation-defined output processing
     int OPOST = 1;
+
+    //Minimum number of characters for noncanonical read
     int VMIN = 6;
+
+    //Timeout in deciseconds for noncanonical read
     int VTIME = 5;
+
+    //Gets what you need, in this case it means to get the window size
     int TIOCGWINSZ = 0x5413;
 
     //Loading the C standard library for POSIX systems
