@@ -43,10 +43,17 @@ interface LibC extends Library
     int ICANON = 2;
 
 
-    //
+    //Echo input characters
     int ECHO = 10;
+
+    //This occurs after all output written to the object referred by fd has been transmitted
+    //and all input that has been received but not read will be discarded before the change is made
     int TCSAFLUSH = 2;
+
+    //Enables XON/XOFF flow control on output
     int IXON = 2000;
+
+    //
     int ICRNL = 400;
     int IEXTEN = 100000;
     int OPOST = 1;
