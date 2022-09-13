@@ -2,12 +2,31 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Structure;
 
+import java.io.IOException;
 import java.util.Arrays;
 
 public class Main
 {
-    public static void main(String[] args)
+    public static void main(String[] args) throws IOException
     {
+        LibC.Termios termios = new LibC.Termios();
+        int returnCode = LibC.INSTANCE.tcgetattr(LibC.SYSTEM_OUT, termios);
+
+        if(returnCode != 0)
+        {
+            System.err.println("There was a problem calling tcgetattr");
+            System.exit(returnCode);
+        }
+
+        /**
+         * Essentially here we are turning off the ECHO, ICANON,
+         */
+        termios.c_lflag &= ~(LibC.ECHO | LibC.ICANON | LibC.IEXTEN | LibC.ISIG);
+        termios.c_iflag &= ~(LibC.IXON | LibC.ICRNL);
+        termios.c_oflag &= ~(LibC.OPOST);
+
+
+
 
     }
 }
@@ -15,8 +34,16 @@ public class Main
 interface LibC extends Library
 {
     int SYSTEM_OUT = 0;
+
+    //Whenever any of the characters "INTR", "QUIT", "SUSP", or "DSUSP" are received,
+    //generate the corresponding signal
     int ISIG = 1;
+
+    //Enables canonical mode
     int ICANON = 2;
+
+
+    //
     int ECHO = 10;
     int TCSAFLUSH = 2;
     int IXON = 2000;
@@ -48,6 +75,7 @@ interface LibC extends Library
             copy.c_lflag = t.c_lflag;
             copy.c_cc = t.c_cc.clone();
 
+
             return copy;
         }
 
@@ -68,7 +96,5 @@ interface LibC extends Library
     int tcgetattr(int fd, Termios termios);
 
     int tcsetattr(int fd, int optionalActions, Termios termios);
-
-
 
 }
