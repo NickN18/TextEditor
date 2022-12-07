@@ -35,15 +35,23 @@ public class Main
             System.out.println("~\r\n");
         }
 
-        System.out.println("\033[7mNick's Text Editor - v1.0.0\033[0m");
+        String status = "Nick's Text Editor - v1.0.0";
+
+        System.out.println("\033[7m" + status
+                + " ".repeat(Math.max(0, columns - status.length()))
+                + "\033[0m");
     }
 
     private static int readInput() throws IOException { return System.in.read(); }
 
     private static void handleInput(int key)
     {
+
         if(key == 'q')
         {
+            System.out.println("\033[2J");
+            System.out.println("\033[H");
+
             LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, originalAttributes);
             System.exit(0);
         }
@@ -120,6 +128,16 @@ interface LibC extends Library
     //Loading the C standard library for POSIX systems
     LibC INSTANCE = Native.load("c", LibC.class);
 
+    @Structure.FieldOrder(value = {"ws_row", "ws_col", "ws_xpixel", "ws_ypixel"})
+    class WindowSize extends Structure
+    {
+        public short ws_row;
+        public short ws_col;
+        public short ws_xpixel;
+        public short ws_ypixel;
+
+    }
+
     @Structure.FieldOrder(value = {"c_iflag", "c_oflag", "c_cflag", "c_lflag", "c_cc"})
     class Termios extends Structure
     {
@@ -162,4 +180,5 @@ interface LibC extends Library
 
     int tcsetattr(int fd, int optionalActions, Termios termios);
 
+    int io
 }
