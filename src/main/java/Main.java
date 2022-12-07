@@ -8,21 +8,28 @@ import java.util.Arrays;
 
 public class Main
 {
+    private static LibC.Termios originalAttributes;
     public static void main(String[] args) throws IOException
     {
         enableRawMode();
 
         while(true)
         {
-            int key = System.in.read();
+            int key = readInput();
+            if(key == 'q')
+            {
+                LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, originalAttributes);
+                System.exit(0);
+            }
 
-            if(key == 'q') { System.exit(0); }
-
-            System.out.println((char) key +  " (" + key + ")\r\n");
+            System.out.print((char) key +  " (" + key + ")\r\n");
         }
     }
 
-    private static void enableRawMode() {
+    private static int readInput() throws IOException { return System.in.read(); }
+
+    private static void enableRawMode()
+    {
         LibC.Termios termios = new LibC.Termios();
         int returnCode = LibC.INSTANCE.tcgetattr(LibC.SYSTEM_OUT, termios);
 
@@ -31,6 +38,8 @@ public class Main
             System.err.println("There was a problem calling tcgetattr");
             System.exit(returnCode);
         }
+
+        originalAttributes = LibC.Termios.of(termios);
 
         System.out.println("termios = " + termios);
 
@@ -41,8 +50,8 @@ public class Main
         termios.c_iflag &= ~(LibC.IXON | LibC.ICRNL);
         termios.c_oflag &= ~(LibC.OPOST);
 
-        //termios.c_cc[LibC.VMIN] = 0;
-        //termios.c_cc[LibC.VTIME] = 1;
+        termios.c_cc[LibC.VMIN] = 0;
+        termios.c_cc[LibC.VTIME] = 1;
 
         LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, termios);
     }
