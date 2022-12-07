@@ -9,24 +9,45 @@ import java.util.Arrays;
 public class Main
 {
     private static LibC.Termios originalAttributes;
+    private static int rows = 10;
+    private static int columns = 10;
     public static void main(String[] args) throws IOException
     {
         enableRawMode();
 
         while(true)
         {
+            refreshScreen();
             int key = readInput();
-            if(key == 'q')
-            {
-                LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, originalAttributes);
-                System.exit(0);
-            }
+            handleInput(key);
 
             System.out.print((char) key +  " (" + key + ")\r\n");
         }
     }
 
+    private static void refreshScreen()
+    {
+        System.out.println("\033[2J");
+        System.out.println("\033[H");
+
+        for(int i = 0; i < rows - 1; i++)
+        {
+            System.out.println("~\r\n");
+        }
+
+        System.out.println("\033[7mNick's Text Editor - v1.0.0\033[0m");
+    }
+
     private static int readInput() throws IOException { return System.in.read(); }
+
+    private static void handleInput(int key)
+    {
+        if(key == 'q')
+        {
+            LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, originalAttributes);
+            System.exit(0);
+        }
+    }
 
     private static void enableRawMode()
     {
