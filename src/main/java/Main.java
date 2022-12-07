@@ -102,10 +102,10 @@ interface LibC extends Library
     @Structure.FieldOrder(value = {"c_iflag", "c_oflag", "c_cflag", "c_lflag", "c_cc"})
     class Termios extends Structure
     {
-        public int c_iflag; // Input modes
-        public int c_oflag; // Output modes
-        public int c_cflag; // Control modes
-        public int c_lflag; // Local modes
+        public long c_iflag; // Input modes
+        public long c_oflag; // Output modes
+        public long c_cflag; // Control modes
+        public long c_lflag; // Local modes
 
         public byte[] c_cc = new byte[19]; // Special characters
 
