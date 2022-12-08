@@ -14,6 +14,7 @@ public class Main
     public static void main(String[] args) throws IOException
     {
         enableRawMode();
+        initializeEditor();
 
         while(true)
         {
@@ -25,21 +26,36 @@ public class Main
         }
     }
 
+    private static void initializeEditor()
+    {
+        LibC.WindowSize windowSize = getWindowSize();
+        rows = windowSize.ws_row;
+        columns = windowSize.ws_col;
+
+    }
+
     private static void refreshScreen()
     {
-        System.out.println("\033[2J");
-        System.out.println("\033[H");
+        StringBuilder stringBuilder = new StringBuilder();
+
+        stringBuilder.append("\033[2J");
+        stringBuilder.append("\033[H");
 
         for(int i = 0; i < rows - 1; i++)
         {
-            System.out.println("~\r\n");
+            stringBuilder.append("~\r\n");
         }
 
         String status = "Nick's Text Editor - v1.0.0";
 
-        System.out.println("\033[7m" + status
-                + " ".repeat(Math.max(0, columns - status.length()))
-                + "\033[0m");
+        stringBuilder.append("\033[7m")
+                .append(status)
+                .append(" ".repeat(Math.max(0, columns - status.length())))
+                .append("\033[0m");
+
+        stringBuilder.append("\033[H");
+
+        System.out.println(stringBuilder);
     }
 
     private static int readInput() throws IOException { return System.in.read(); }
@@ -83,6 +99,19 @@ public class Main
         termios.c_cc[LibC.VTIME] = 1;
 
         LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, termios);
+
+    }
+    private static LibC.WindowSize getWindowSize()
+    {
+        final LibC.WindowSize windowSize = new LibC.WindowSize();
+        final int returnCode = LibC.INSTANCE.ioctl(LibC.SYSTEM_OUT, LibC.TIOCGWINSZ, windowSize);
+
+        if(returnCode != 0)
+        {
+            System.out.println("ioctl failed with return code [={}]" + returnCode);
+            System.exit(1);
+        }
+        return windowSize;
     }
 }
 
@@ -136,7 +165,11 @@ interface LibC extends Library
         public short ws_xpixel;
         public short ws_ypixel;
 
+
+
     }
+
+
 
     @Structure.FieldOrder(value = {"c_iflag", "c_oflag", "c_cflag", "c_lflag", "c_cc"})
     class Termios extends Structure
@@ -180,5 +213,5 @@ interface LibC extends Library
 
     int tcsetattr(int fd, int optionalActions, Termios termios);
 
-    int io
+    int ioctl(int fd, int opt, WindowSize windowSize);
 }
