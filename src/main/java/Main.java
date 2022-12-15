@@ -58,7 +58,17 @@ public class Main
         System.out.println(stringBuilder);
     }
 
-    private static int readInput() throws IOException { return System.in.read(); }
+    private static int readInput() throws IOException
+    {
+        int key = System.in.read();
+        if(key != '\033') { return key; }
+
+        int nextKey = System.in.read();
+        if(nextKey != '[') { return nextKey; }
+
+
+        return key;
+    }
 
     private static void handleInput(int key)
     {
@@ -71,6 +81,7 @@ public class Main
             LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, originalAttributes);
             System.exit(0);
         }
+
     }
 
     private static void enableRawMode()
