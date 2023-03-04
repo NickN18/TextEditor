@@ -8,6 +8,13 @@ import java.util.Arrays;
 
 public class Main
 {
+    private static final int ARROW_UP = 1000, ARROW_DOWN = 1000;
+    private static final int ARROW_RIGHT = 1000, ARROW_LEFT = 1000;
+    private static final int HOME = 1000;
+    private static final int END = 1000;
+    private static final int DEL = 1000;
+    private static final int PAGE_UP = 1000;
+    private static final int PAGE_DOWN = 1000;
     private static LibC.Termios originalAttributes;
     private static int rows = 10;
     private static int columns = 10;
@@ -64,10 +71,58 @@ public class Main
         if(key != '\033') { return key; }
 
         int nextKey = System.in.read();
-        if(nextKey != '[') { return nextKey; }
+        if(nextKey != '[' && nextKey != 'O') { return nextKey; }
 
+        int nextNextKey = System.in.read();
 
-        return key;
+        if(nextKey == '[')
+        {
+            return switch (nextNextKey) {
+                        case 'A' -> ARROW_UP;
+                        case 'B' -> ARROW_DOWN;
+                        case 'C' -> ARROW_RIGHT;
+                        case 'D' -> ARROW_LEFT;
+                        case 'H' -> HOME;
+                        case 'F' -> END;
+
+                        case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> {
+                            int newChar = System.in.read();
+
+                            if(newChar != '~') { yield newChar; }
+
+                            switch (nextNextKey)
+                            {
+                                case '1':
+                                case '7':
+                                    yield HOME;
+
+                                case '3':
+                                    yield DEL;
+
+                                case '4':
+                                case '8':
+                                    yield END;
+
+                                case '5':
+                                    yield PAGE_UP;
+
+                                case '6':
+                                    yield PAGE_DOWN;
+
+                                default: yield nextNextKey;
+
+                            }
+                        }
+                        default -> nextNextKey;
+            };
+        } else
+        {
+            return switch (nextNextKey) {
+                        case 'H' -> HOME;
+                        case 'F' -> END;
+                        default -> nextNextKey;
+            };
+        }
     }
 
     private static void handleInput(int key)
@@ -100,7 +155,7 @@ public class Main
         System.out.println("termios = " + termios);
 
         /**
-         * Essentially here we are turning off the ECHO, ICANON,
+         * Essentially here we are turning off the ECHO, ICANON, IEXTEN, ISIG flags
          */
         termios.c_lflag &= ~(LibC.ECHO | LibC.ICANON | LibC.IEXTEN | LibC.ISIG);
         termios.c_iflag &= ~(LibC.IXON | LibC.ICRNL);
@@ -156,10 +211,10 @@ interface LibC extends Library
     //Enable implementation-defined output processing
     int OPOST = 1;
 
-    //Minimum number of characters for noncanonical read
+    //Minimum number of characters for non-canonical read
     int VMIN = 6;
 
-    //Timeout in deciseconds for noncanonical read
+    //Timeout in deciseconds for non-canonical read
     int VTIME = 5;
 
     //Gets what you need, in this case it means to get the window size
@@ -176,10 +231,7 @@ interface LibC extends Library
         public short ws_xpixel;
         public short ws_ypixel;
 
-
-
     }
-
 
 
     @Structure.FieldOrder(value = {"c_iflag", "c_oflag", "c_cflag", "c_lflag", "c_cc"})
