@@ -72,9 +72,28 @@ public class Main
     {
         StringBuilder stringBuilder = new StringBuilder();
 
-        stringBuilder.append("\033[2J");
         stringBuilder.append("\033[H");
 
+        drawFileContent(stringBuilder);
+        drawStatusBar(stringBuilder);
+
+        drawCursor(stringBuilder);
+
+        System.out.println(stringBuilder);
+    }
+
+    private static void drawStatusBar(StringBuilder stringBuilder)
+    {
+        String status = "Nick's Text Editor - v1.0.0 | X:" + cursorX + "Y:" + cursorY;
+
+        stringBuilder.append("\033[7m")
+                .append(status)
+                .append(" ".repeat(Math.max(0, columns - status.length())))
+                .append("\033[0m");
+    }
+
+    private static void drawFileContent(StringBuilder stringBuilder)
+    {
         for(int i = 0; i < rows; i++)
         {
             int fileIndex = offsetY + i;
@@ -87,19 +106,6 @@ public class Main
             }
             stringBuilder.append("\033[K\r\n");
         }
-
-        String status = "Nick's Text Editor - v1.0.0";
-
-        stringBuilder.append("\033[7m")
-                .append(status)
-                .append(" ".repeat(Math.max(0, columns - status.length())))
-                .append("\033[0m");
-
-        //stringBuilder.append(String.format("\033[%d;%dH", cursorY + 1, cursorX + 1));
-
-        drawCursor(stringBuilder);
-
-        System.out.println(stringBuilder);
     }
 
     private static void drawCursor(StringBuilder stringBuilder) { stringBuilder.append(String.format("\033[%d;%dH", cursorY - offsetY + 1, cursorX + 1)); }

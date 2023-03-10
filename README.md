@@ -13,3 +13,5 @@ Example: <br>
 Run <code>java -cp jna-5.12.1.jar Main.java</code>
 
 Change <code>jna-5.12.1.jar</code> to whatever version or name your jar file is
+
+Testing command for me: java -cp jna-5.12.1.jar Main.java Desktop/IntelliJ/commandLineTextEditor/TextEditor/hello.txt
