@@ -4,22 +4,33 @@ import com.sun.jna.Structure;
 
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Stream;
 
 public class Main
 {
-    private static final int ARROW_UP = 1000, ARROW_DOWN = 1000;
-    private static final int ARROW_RIGHT = 1000, ARROW_LEFT = 1000;
-    private static final int HOME = 1000;
-    private static final int END = 1000;
-    private static final int DEL = 1000;
-    private static final int PAGE_UP = 1000;
-    private static final int PAGE_DOWN = 1000;
+    private static final int ARROW_UP = 1000, ARROW_DOWN = 1001;
+    private static final int ARROW_LEFT = 1002, ARROW_RIGHT = 1003;
+    private static final int HOME = 1004;
+    private static final int END = 1005;
+    private static final int PAGE_UP = 1006;
+    private static final int PAGE_DOWN = 1007;
+    private static final int DEL = 1008;
     private static LibC.Termios originalAttributes;
     private static int rows = 10;
     private static int columns = 10;
+
+    private static int cursorX = 0, cursorY = 0;
+    private static int offsetY = 0;
+    private static List<String> content = List.of();
+
     public static void main(String[] args) throws IOException
     {
+        openFile(args);
+
         enableRawMode();
         initializeEditor();
 
@@ -28,15 +39,31 @@ public class Main
             refreshScreen();
             int key = readInput();
             handleInput(key);
+        }
+    }
 
-            System.out.print((char) key +  " (" + key + ")\r\n");
+    private static void openFile(String[] args)
+    {
+        if(args.length == 1)
+        {
+            String filename = args[0];
+            Path path = Path.of(filename);
+
+            if(Files.exists(path))
+            {
+                try(Stream<String> stream = Files.lines(path)) {
+                    content = stream.toList();
+                } catch (IOException e) {
+                    //TODO: Display message in status bar
+                }
+            }
         }
     }
 
     private static void initializeEditor()
     {
         LibC.WindowSize windowSize = getWindowSize();
-        rows = windowSize.ws_row;
+        rows = windowSize.ws_row - 1;
         columns = windowSize.ws_col;
 
     }
@@ -48,9 +75,17 @@ public class Main
         stringBuilder.append("\033[2J");
         stringBuilder.append("\033[H");
 
-        for(int i = 0; i < rows - 1; i++)
+        for(int i = 0; i < rows; i++)
         {
-            stringBuilder.append("~\r\n");
+            int fileIndex = offsetY + i;
+            if(fileIndex >= content.size())
+            {
+                stringBuilder.append("~");
+            } else
+            {
+                stringBuilder.append(content.get(fileIndex));
+            }
+            stringBuilder.append("\033[K\r\n");
         }
 
         String status = "Nick's Text Editor - v1.0.0";
@@ -60,10 +95,15 @@ public class Main
                 .append(" ".repeat(Math.max(0, columns - status.length())))
                 .append("\033[0m");
 
-        stringBuilder.append("\033[H");
+        //stringBuilder.append(String.format("\033[%d;%dH", cursorY + 1, cursorX + 1));
+
+        drawCursor(stringBuilder);
 
         System.out.println(stringBuilder);
     }
+
+    private static void drawCursor(StringBuilder stringBuilder) { stringBuilder.append(String.format("\033[%d;%dH", cursorY - offsetY + 1, cursorX + 1)); }
+
 
     private static int readInput() throws IOException
     {
@@ -127,16 +167,46 @@ public class Main
 
     private static void handleInput(int key)
     {
-
         if(key == 'q')
         {
-            System.out.println("\033[2J");
-            System.out.println("\033[H");
-
-            LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, originalAttributes);
-            System.exit(0);
+            exit();
+        } else if(List.of(ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, HOME, END).contains(key))
+        {
+            moveCursor(key);
         }
 
+    }
+
+    private static void moveCursor(int key)
+    {
+        switch(key)
+        {
+            case ARROW_UP -> {
+                if(cursorY > 0) { cursorY--; }
+            }
+            case ARROW_DOWN -> {
+                if(cursorY < rows - 1) { cursorY++; }
+            }
+            case ARROW_LEFT -> {
+                if(cursorX > 0) { cursorX--; }
+            }
+            case ARROW_RIGHT -> {
+                if(cursorX < columns - 1) { cursorX++; }
+            }
+
+            case HOME -> cursorX = 0;
+            case END -> cursorX = columns - 1;
+
+        }
+    }
+
+    private static void exit()
+    {
+        System.out.println("\033[2J");
+        System.out.println("\033[H");
+
+        LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, originalAttributes);
+        System.exit(0);
     }
 
     private static void enableRawMode()
@@ -152,8 +222,6 @@ public class Main
 
         originalAttributes = LibC.Termios.of(termios);
 
-        System.out.println("termios = " + termios);
-
         /**
          * Essentially here we are turning off the ECHO, ICANON, IEXTEN, ISIG flags
          */
@@ -161,8 +229,8 @@ public class Main
         termios.c_iflag &= ~(LibC.IXON | LibC.ICRNL);
         termios.c_oflag &= ~(LibC.OPOST);
 
-        termios.c_cc[LibC.VMIN] = 0;
-        termios.c_cc[LibC.VTIME] = 1;
+        //termios.c_cc[LibC.VMIN] = 0;
+        //termios.c_cc[LibC.VTIME] = 1;
 
         LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, termios);
 
