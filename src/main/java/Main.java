@@ -24,7 +24,7 @@ public class Main
     private static int columns = 10;
 
     private static int cursorX = 0, cursorY = 0;
-    private static int offsetY = 0;
+    private static int offsetX = 0, offsetY = 0;
     private static List<String> content = List.of();
 
     public static void main(String[] args) throws IOException
@@ -50,6 +50,19 @@ public class Main
         } else if(cursorY < offsetY)
         {
             offsetY = cursorY;
+        }
+
+        /**
+         * ---------------------------------------
+         * HORIZONTAL SCROLLING
+         * ---------------------------------------
+         */
+        if(cursorX >= rows + offsetX)
+        {
+            offsetX = cursorX - columns + 1;
+        } else if(cursorX < offsetX)
+        {
+            offsetX = cursorX;
         }
     }
 
@@ -107,18 +120,28 @@ public class Main
         for(int i = 0; i < rows; i++)
         {
             int fileIndex = offsetY + i;
+
             if(fileIndex >= content.size())
             {
                 stringBuilder.append("~");
             } else
             {
-                stringBuilder.append(content.get(fileIndex));
+                String line = content.get(fileIndex);
+                int lineToDraw = line.length() - offsetX;
+
+                if(lineToDraw < 0) { lineToDraw = 0; }
+                if(lineToDraw > columns) { lineToDraw = columns; }
+
+                if(lineToDraw > 0 )
+                {
+                    stringBuilder.append(line, offsetX, offsetX + lineToDraw);
+                }
             }
             stringBuilder.append("\033[K\r\n");
         }
     }
 
-    private static void drawCursor(StringBuilder stringBuilder) { stringBuilder.append(String.format("\033[%d;%dH", cursorY - offsetY + 1, cursorX + 1)); }
+    private static void drawCursor(StringBuilder stringBuilder) { stringBuilder.append(String.format("\033[%d;%dH", cursorY - offsetY + 1, cursorX - offsetX + 1)); }
 
 
     private static int readInput() throws IOException
@@ -207,7 +230,7 @@ public class Main
                 if(cursorX > 0) { cursorX--; }
             }
             case ARROW_RIGHT -> {
-                if(cursorX < columns - 1) { cursorX++; }
+                if(cursorX < content.get(cursorY).length() - 1) { cursorX++; }
             }
             case PAGE_UP, PAGE_DOWN ->  {
                 if(key == PAGE_UP)
@@ -232,6 +255,7 @@ public class Main
     }
 
     private static void moveToTopOfScreen() { cursorY = offsetY; }
+
     private static void moveToBottomOfScreen()
     {
         cursorY = offsetY + rows - 1;
