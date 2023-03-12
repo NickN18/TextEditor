@@ -186,7 +186,7 @@ public class Main
         if(key == 'q')
         {
             exit();
-        } else if(List.of(ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, HOME, END).contains(key))
+        } else if(List.of(ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, HOME, END, PAGE_UP, PAGE_DOWN).contains(key))
         {
             moveCursor(key);
         }
@@ -209,12 +209,36 @@ public class Main
             case ARROW_RIGHT -> {
                 if(cursorX < columns - 1) { cursorX++; }
             }
+            case PAGE_UP, PAGE_DOWN ->  {
+                if(key == PAGE_UP)
+                {
+                    moveToTopOfScreen();
+                } else if(key == PAGE_DOWN)
+                {
+                    moveToBottomOfScreen();
+                }
+
+                for(int i = 0; i < rows; i++)
+                {
+                    moveCursor(key == PAGE_UP ? ARROW_UP : ARROW_DOWN);
+                }
+
+            }
 
             case HOME -> cursorX = 0;
             case END -> cursorX = columns - 1;
 
         }
     }
+
+    private static void moveToTopOfScreen() { cursorY = offsetY; }
+    private static void moveToBottomOfScreen()
+    {
+        cursorY = offsetY + rows - 1;
+        if(cursorY > content.size()) { cursorY = content.size(); }
+    }
+
+
 
     private static void exit()
     {
