@@ -30,15 +30,26 @@ public class Main
     public static void main(String[] args) throws IOException
     {
         openFile(args);
-
         enableRawMode();
         initializeEditor();
 
         while(true)
         {
+            scrollScreen();
             refreshScreen();
             int key = readInput();
             handleInput(key);
+        }
+    }
+
+    private static void scrollScreen()
+    {
+        if(cursorY >= rows + offsetY)
+        {
+            offsetY = cursorY - rows + 1;
+        } else if(cursorY < offsetY)
+        {
+            offsetY = cursorY;
         }
     }
 
@@ -76,7 +87,6 @@ public class Main
 
         drawFileContent(stringBuilder);
         drawStatusBar(stringBuilder);
-
         drawCursor(stringBuilder);
 
         System.out.println(stringBuilder);
