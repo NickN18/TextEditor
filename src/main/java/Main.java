@@ -1,5 +1,6 @@
 import com.sun.jna.Library;
 import com.sun.jna.Native;
+import com.sun.jna.Platform;
 import com.sun.jna.Structure;
 
 
@@ -19,18 +20,19 @@ public class Main
     private static final int PAGE_UP = 1006;
     private static final int PAGE_DOWN = 1007;
     private static final int DEL = 1008;
-    private static LibC.Termios originalAttributes;
+
     private static int rows = 10;
     private static int columns = 10;
 
     private static int cursorX = 0, cursorY = 0;
     private static int offsetX = 0, offsetY = 0;
+
+    private static Terminal terminal = Platform.isMac() ? new MacOSTerminal() : new UnixTerminal();
     private static List<String> content = List.of();
 
     public static void main(String[] args) throws IOException
     {
         openFile(args);
-        enableRawMode();
         initializeEditor();
 
         while(true)
@@ -57,7 +59,7 @@ public class Main
          * HORIZONTAL SCROLLING
          * ---------------------------------------
          */
-        if(cursorX >= rows + offsetX)
+        if(cursorX >= columns + offsetX)
         {
             offsetX = cursorX - columns + 1;
         } else if(cursorX < offsetX)
@@ -86,9 +88,10 @@ public class Main
 
     private static void initializeEditor()
     {
-        LibC.WindowSize windowSize = getWindowSize();
-        rows = windowSize.ws_row - 1;
-        columns = windowSize.ws_col;
+        terminal.enableRawMode();
+        WindowSize windowSize = terminal.getWindowSize();
+        rows = windowSize.rows() - 1;
+        columns = windowSize.columns();
 
     }
 
@@ -98,6 +101,7 @@ public class Main
 
         stringBuilder.append("\033[H");
 
+        moveToTopOfScreen();
         drawFileContent(stringBuilder);
         drawStatusBar(stringBuilder);
         drawCursor(stringBuilder);
@@ -132,7 +136,7 @@ public class Main
                 if(lineToDraw < 0) { lineToDraw = 0; }
                 if(lineToDraw > columns) { lineToDraw = columns; }
 
-                if(lineToDraw > 0 )
+                if(lineToDraw > 0)
                 {
                     stringBuilder.append(line, offsetX, offsetX + lineToDraw);
                 }
@@ -252,7 +256,6 @@ public class Main
             case HOME -> cursorX = 0;
             case END -> {
                 if(currentLine != null) { cursorX = currentLine.length(); }
-
             }
 
         }
@@ -281,11 +284,37 @@ public class Main
         System.out.println("\033[2J");
         System.out.println("\033[H");
 
-        LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, originalAttributes);
+        terminal.disableRawMode();
         System.exit(0);
     }
 
-    private static void enableRawMode()
+
+}
+
+interface Terminal
+{
+    void enableRawMode();
+
+    void disableRawMode();
+
+    WindowSize getWindowSize();
+}
+
+
+
+
+
+/**
+ * --------------------------------------------------------------------------
+ * Unix Support
+ * --------------------------------------------------------------------------
+ */
+class UnixTerminal implements Terminal
+{
+    private static LibC.Termios originalAttributes;
+
+    @Override
+    public void enableRawMode()
     {
         LibC.Termios termios = new LibC.Termios();
         int returnCode = LibC.INSTANCE.tcgetattr(LibC.SYSTEM_OUT, termios);
@@ -311,7 +340,15 @@ public class Main
         LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, termios);
 
     }
-    private static LibC.WindowSize getWindowSize()
+
+    @Override
+    public void disableRawMode()
+    {
+        LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, originalAttributes);
+    }
+
+    @Override
+    public WindowSize getWindowSize()
     {
         final LibC.WindowSize windowSize = new LibC.WindowSize();
         final int returnCode = LibC.INSTANCE.ioctl(LibC.SYSTEM_OUT, LibC.TIOCGWINSZ, windowSize);
@@ -321,104 +358,273 @@ public class Main
             System.out.println("ioctl failed with return code [={}]" + returnCode);
             System.exit(1);
         }
-        return windowSize;
+        return new WindowSize(windowSize.ws_row, windowSize.ws_col);
+    }
+
+
+    interface LibC extends Library
+    {
+        int SYSTEM_OUT = 0;
+
+        //Whenever any of the characters "INTR", "QUIT", "SUSP", or "DSUSP" are received,
+        //generate the corresponding signal
+        int ISIG = 1;
+
+        //Enables canonical mode
+        int ICANON = 2;
+
+        //Echo input characters
+        int ECHO = 10;
+
+        //This occurs after all output written to the object referred by fd has been transmitted
+        //and all input that has been received but not read will be discarded before the change is made
+        int TCSAFLUSH = 2;
+
+        //Enables XON/XOFF flow control on output
+        int IXON = 2000;
+
+        //Translates carriage return to newline on input
+        int ICRNL = 400;
+
+        //Enables implementation-defined input processing
+        int IEXTEN = 100000;
+
+        //Enable implementation-defined output processing
+        int OPOST = 1;
+
+        //Minimum number of characters for non-canonical read
+        int VMIN = 6;
+
+        //Timeout in deciseconds for non-canonical read
+        int VTIME = 5;
+
+        //Gets what you need, in this case it means to get the window size
+        int TIOCGWINSZ = 0x40087468;
+
+        //Loading the C standard library for POSIX systems
+        LibC INSTANCE = Native.load("c", LibC.class);
+
+        @Structure.FieldOrder(value = {"ws_row", "ws_col", "ws_xpixel", "ws_ypixel"})
+        class WindowSize extends Structure
+        {
+            public short ws_row;
+            public short ws_col;
+            public short ws_xpixel;
+            public short ws_ypixel;
+
+        }
+
+
+        @Structure.FieldOrder(value = {"c_iflag", "c_oflag", "c_cflag", "c_lflag", "c_cc"})
+        class Termios extends Structure
+        {
+            public long c_iflag; // Input modes
+            public long c_oflag; // Output modes
+            public long c_cflag; // Control modes
+            public long c_lflag; // Local modes
+
+            public byte[] c_cc = new byte[19]; // Special characters
+
+            public Termios() {}
+
+            public static Termios of(Termios t)
+            {
+                Termios copy = new Termios();
+                copy.c_iflag = t.c_iflag;
+                copy.c_oflag = t.c_oflag;
+                copy.c_cflag = t.c_cflag;
+                copy.c_lflag = t.c_lflag;
+                copy.c_cc = t.c_cc.clone();
+
+                return copy;
+            }
+
+            @Override
+            public String toString()
+            {
+                return "Termios {" +
+                        "c_iflag = " + c_iflag +
+                        ", c_oflag = " + c_oflag +
+                        ", c_cflag = " + c_cflag +
+                        ", c_lflag = " + c_lflag +
+                        ", c_cc = " + Arrays.toString(c_cc) +
+                        "}";
+            }
+
+        }
+
+        int tcgetattr(int fd, Termios termios);
+
+        int tcsetattr(int fd, int optionalActions, Termios termios);
+
+        int ioctl(int fd, int opt, WindowSize windowSize);
     }
 }
 
-interface LibC extends Library
+
+
+/**
+ * --------------------------------------------------------------------------
+ * MacOS Support
+ * --------------------------------------------------------------------------
+ */
+class MacOSTerminal implements Terminal
 {
-    int SYSTEM_OUT = 0;
+    private static LibC.Termios originalAttributes;
 
-    //Whenever any of the characters "INTR", "QUIT", "SUSP", or "DSUSP" are received,
-    //generate the corresponding signal
-    int ISIG = 1;
-
-    //Enables canonical mode
-    int ICANON = 2;
-
-    //Echo input characters
-    int ECHO = 10;
-
-    //This occurs after all output written to the object referred by fd has been transmitted
-    //and all input that has been received but not read will be discarded before the change is made
-    int TCSAFLUSH = 2;
-
-    //Enables XON/XOFF flow control on output
-    int IXON = 2000;
-
-    //Translates carriage return to newline on input
-    int ICRNL = 400;
-
-    //Enables implementation-defined input processing
-    int IEXTEN = 100000;
-
-    //Enable implementation-defined output processing
-    int OPOST = 1;
-
-    //Minimum number of characters for non-canonical read
-    int VMIN = 6;
-
-    //Timeout in deciseconds for non-canonical read
-    int VTIME = 5;
-
-    //Gets what you need, in this case it means to get the window size
-    int TIOCGWINSZ = 0x40087468;
-
-    //Loading the C standard library for POSIX systems
-    LibC INSTANCE = Native.load("c", LibC.class);
-
-    @Structure.FieldOrder(value = {"ws_row", "ws_col", "ws_xpixel", "ws_ypixel"})
-    class WindowSize extends Structure
+    @Override
+    public void enableRawMode()
     {
-        public short ws_row;
-        public short ws_col;
-        public short ws_xpixel;
-        public short ws_ypixel;
+        LibC.Termios termios = new LibC.Termios();
+        int returnCode = LibC.INSTANCE.tcgetattr(LibC.SYSTEM_OUT, termios);
+
+        if(returnCode != 0)
+        {
+            System.err.println("There was a problem calling tcgetattr");
+            System.exit(returnCode);
+        }
+
+        originalAttributes = LibC.Termios.of(termios);
+
+        /**
+         * Essentially here we are turning off the ECHO, ICANON, IEXTEN, ISIG flags
+         */
+        termios.c_lflag &= ~(LibC.ECHO | LibC.ICANON | LibC.IEXTEN | LibC.ISIG);
+        termios.c_iflag &= ~(LibC.IXON | LibC.ICRNL);
+        termios.c_oflag &= ~(LibC.OPOST);
+
+        //termios.c_cc[LibC.VMIN] = 0;
+        //termios.c_cc[LibC.VTIME] = 1;
+
+        LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, termios);
 
     }
 
-
-    @Structure.FieldOrder(value = {"c_iflag", "c_oflag", "c_cflag", "c_lflag", "c_cc"})
-    class Termios extends Structure
+    @Override
+    public void disableRawMode()
     {
-        public long c_iflag; // Input modes
-        public long c_oflag; // Output modes
-        public long c_cflag; // Control modes
-        public long c_lflag; // Local modes
-
-        public byte[] c_cc = new byte[19]; // Special characters
-
-        public Termios() {}
-
-        public static Termios of(Termios t)
-        {
-            Termios copy = new Termios();
-            copy.c_iflag = t.c_iflag;
-            copy.c_oflag = t.c_oflag;
-            copy.c_cflag = t.c_cflag;
-            copy.c_lflag = t.c_lflag;
-            copy.c_cc = t.c_cc.clone();
-
-            return copy;
-        }
-
-        @Override
-        public String toString()
-        {
-            return "Termios {" +
-                    "c_iflag = " + c_iflag +
-                    ", c_oflag = " + c_oflag +
-                    ", c_cflag = " + c_cflag +
-                    ", c_lflag = " + c_lflag +
-                    ", c_cc = " + Arrays.toString(c_cc) +
-                    "}";
-        }
-
+        LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT, LibC.TCSAFLUSH, originalAttributes);
     }
 
-    int tcgetattr(int fd, Termios termios);
+    @Override
+    public WindowSize getWindowSize()
+    {
+        final LibC.WindowSize windowSize = new LibC.WindowSize();
+        final int returnCode = LibC.INSTANCE.ioctl(LibC.SYSTEM_OUT, LibC.TIOCGWINSZ, windowSize);
 
-    int tcsetattr(int fd, int optionalActions, Termios termios);
+        if(returnCode != 0)
+        {
+            System.out.println("ioctl failed with return code [={}]" + returnCode);
+            System.exit(1);
+        }
+        return new WindowSize(windowSize.ws_row, windowSize.ws_col);
+    }
 
-    int ioctl(int fd, int opt, WindowSize windowSize);
+
+    interface LibC extends Library
+    {
+        int SYSTEM_OUT = 0;
+
+        //Whenever any of the characters "INTR", "QUIT", "SUSP", or "DSUSP" are received,
+        //generate the corresponding signal
+        int ISIG = 1;
+
+        //Enables canonical mode
+        int ICANON = 2;
+
+        //Echo input characters
+        int ECHO = 10;
+
+        //This occurs after all output written to the object referred by fd has been transmitted
+        //and all input that has been received but not read will be discarded before the change is made
+        int TCSAFLUSH = 2;
+
+        //Enables XON/XOFF flow control on output
+        int IXON = 2000;
+
+        //Translates carriage return to newline on input
+        int ICRNL = 400;
+
+        //Enables implementation-defined input processing
+        int IEXTEN = 100000;
+
+        //Enable implementation-defined output processing
+        int OPOST = 1;
+
+        //Minimum number of characters for non-canonical read
+        int VMIN = 6;
+
+        //Timeout in deciseconds for non-canonical read
+        int VTIME = 5;
+
+        //Gets what you need, in this case it means to get the window size
+        int TIOCGWINSZ = 0x40087468;
+
+        //Loading the C standard library for POSIX systems
+        LibC INSTANCE = Native.load("c", LibC.class);
+
+        @Structure.FieldOrder(value = {"ws_row", "ws_col", "ws_xpixel", "ws_ypixel"})
+        class WindowSize extends Structure
+        {
+            public short ws_row;
+            public short ws_col;
+            public short ws_xpixel;
+            public short ws_ypixel;
+
+        }
+
+
+        @Structure.FieldOrder(value = {"c_iflag", "c_oflag", "c_cflag", "c_lflag", "c_cc"})
+        class Termios extends Structure
+        {
+            public long c_iflag; // Input modes
+            public long c_oflag; // Output modes
+            public long c_cflag; // Control modes
+            public long c_lflag; // Local modes
+
+            public byte[] c_cc = new byte[19]; // Special characters
+
+            public Termios() {}
+
+            public static Termios of(Termios t)
+            {
+                Termios copy = new Termios();
+                copy.c_iflag = t.c_iflag;
+                copy.c_oflag = t.c_oflag;
+                copy.c_cflag = t.c_cflag;
+                copy.c_lflag = t.c_lflag;
+                copy.c_cc = t.c_cc.clone();
+
+                return copy;
+            }
+
+            @Override
+            public String toString()
+            {
+                return "Termios {" +
+                        "c_iflag = " + c_iflag +
+                        ", c_oflag = " + c_oflag +
+                        ", c_cflag = " + c_cflag +
+                        ", c_lflag = " + c_lflag +
+                        ", c_cc = " + Arrays.toString(c_cc) +
+                        "}";
+            }
+
+        }
+
+        int tcgetattr(int fd, Termios termios);
+
+        int tcsetattr(int fd, int optionalActions, Termios termios);
+
+        int ioctl(int fd, int opt, WindowSize windowSize);
+    }
 }
+
+
+record WindowSize(int rows, int columns)
+{
+
+}
+
+
+
