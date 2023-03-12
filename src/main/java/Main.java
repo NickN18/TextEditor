@@ -191,7 +191,7 @@ public class Main
                 if(cursorY > 0) { cursorY--; }
             }
             case ARROW_DOWN -> {
-                if(cursorY < rows - 1) { cursorY++; }
+                if(cursorY < content.size()) { cursorY++; }
             }
             case ARROW_LEFT -> {
                 if(cursorX > 0) { cursorX--; }
