@@ -218,6 +218,7 @@ public class Main
 
     private static void moveCursor(int key)
     {
+        String currentLine = currentLine();
         switch(key)
         {
             case ARROW_UP -> {
@@ -230,7 +231,7 @@ public class Main
                 if(cursorX > 0) { cursorX--; }
             }
             case ARROW_RIGHT -> {
-                if(cursorX < content.get(cursorY).length() - 1) { cursorX++; }
+                if(currentLine != null && cursorX < currentLine.length()) { cursorX++; }
             }
             case PAGE_UP, PAGE_DOWN ->  {
                 if(key == PAGE_UP)
@@ -249,10 +250,21 @@ public class Main
             }
 
             case HOME -> cursorX = 0;
-            case END -> cursorX = columns - 1;
+            case END -> {
+                if(currentLine != null) { cursorX = currentLine.length(); }
+
+            }
 
         }
+        String newCurrentLine = currentLine();
+        if(newCurrentLine != null && cursorX > newCurrentLine.length())
+        {
+            cursorX = newCurrentLine.length();
+        }
+
     }
+
+    private static String currentLine() { return cursorY < content.size() ? content.get(cursorY) : null; }
 
     private static void moveToTopOfScreen() { cursorY = offsetY; }
 
